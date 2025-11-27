@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>启明星天文社 - 北京市第二中学</title>
+    <link rel="stylesheet" href="/src/styles/main.css">
+</head>
+<body>
+    <div id="app">
+        <!-- 导航栏 -->
+        <nav class="navbar">
+            <div class="nav-container">
+                <div class="nav-logo">
+                    <span class="logo-text">启明星天文社</span>
+                </div>
+                <ul class="nav-menu">
+                    <li><a href="#home" class="nav-link active">首页</a></li>
+                    <li><a href="#about" class="nav-link">社团介绍</a></li>
+                    <li><a href="#classroom" class="nav-link">微课堂</a></li>
+                    <li><a href="#lab" class="nav-link">虚拟实验室</a></li>
+                </ul>
+                <div class="nav-toggle">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        </nav>
+
+        <!-- 封面部分 -->
+        <section id="home" class="hero-section">
+            <div class="hero-background">
+                <canvas id="stars-canvas"></canvas>
+            </div>
+            <div class="hero-content">
+                <h1 class="hero-title">
+                    <span class="gradient-text">启明星天文社</span>
+                </h1>
+                <p class="hero-subtitle">探索宇宙的奥秘，点亮心中的星辰</p>
+                <p class="hero-description">北京市第二中学</p>
+                <div class="hero-buttons">
+                    <a href="#about" class="btn btn-primary">了解更多</a>
+                    <a href="#lab" class="btn btn-secondary">进入实验室</a>
+                </div>
+            </div>
+            <div class="scroll-indicator">
+                <div class="mouse"></div>
+            </div>
+        </section>
+
+        <!-- 社团介绍 -->
+        <section id="about" class="section about-section">
+            <div class="container">
+                <h2 class="section-title">
+                    <span class="gradient-text">社团介绍</span>
+                </h2>
+                <div class="about-content">
+                    <div class="about-card">
+                        <div class="card-icon">🌟</div>
+                        <h3>我们的使命</h3>
+                        <p>启明星天文社致力于普及天文知识，培养同学们对宇宙的好奇心和探索精神。我们通过观测、学习和实践，让每一位成员都能在浩瀚星空中找到属于自己的那颗星。</p>
+                    </div>
+                    <div class="about-card">
+                        <div class="card-icon">🔭</div>
+                        <h3>活动内容</h3>
+                        <p>定期组织天文观测活动、举办天文知识讲座、参与天文竞赛、开展天文摄影实践，以及组织参观天文馆和科研机构等活动。</p>
+                    </div>
+                    <div class="about-card">
+                        <div class="card-icon">⭐</div>
+                        <h3>社团成就</h3>
+                        <p>多年来，启明星天文社培养了大批天文爱好者，成员在全国和市级天文竞赛中屡获佳绩，为学校赢得了荣誉。</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 天文学微课堂 -->
+        <section id="classroom" class="section classroom-section">
+            <div class="container">
+                <h2 class="section-title">
+                    <span class="gradient-text">天文学微课堂</span>
+                </h2>
+                <div class="classroom-grid">
+                    <div class="classroom-card">
+                        <div class="card-header">
+                            <h3>太阳系探索</h3>
+                            <span class="card-badge">基础</span>
+                        </div>
+                        <div class="card-body">
+                            <p>了解太阳系八大行星的特点，探索它们的神秘世界。</p>
+                            <ul class="lesson-list">
+                                <li>✓ 太阳系结构</li>
+                                <li>✓ 行星运动规律</li>
+                                <li>✓ 小行星带</li>
+                            </ul>
+                        </div>
+                        <div class="card-footer">
+                            <button class="btn btn-outline">开始学习</button>
+                        </div>
+                    </div>
+                    <div class="classroom-card">
+                        <div class="card-header">
+                            <h3>恒星与星系</h3>
+                            <span class="card-badge">进阶</span>
+                        </div>
+                        <div class="card-body">
+                            <p>深入探索恒星的演化过程，了解星系的形成与结构。</p>
+                            <ul class="lesson-list">
+                                <li>✓ 恒星生命周期</li>
+                                <li>✓ 星系分类</li>
+                                <li>✓ 黑洞与中子星</li>
+                            </ul>
+                        </div>
+                        <div class="card-footer">
+                            <button class="btn btn-outline">开始学习</button>
+                        </div>
+                    </div>
+                    <div class="classroom-card">
+                        <div class="card-header">
+                            <h3>宇宙学基础</h3>
+                            <span class="card-badge">高级</span>
+                        </div>
+                        <div class="card-body">
+                            <p>探索宇宙的起源、演化和未来，了解大爆炸理论和暗物质。</p>
+                            <ul class="lesson-list">
+                                <li>✓ 大爆炸理论</li>
+                                <li>✓ 暗物质与暗能量</li>
+                                <li>✓ 宇宙膨胀</li>
+                            </ul>
+                        </div>
+                        <div class="card-footer">
+                            <button class="btn btn-outline">开始学习</button>
+                        </div>
+                    </div>
+                    <div class="classroom-card">
+                        <div class="card-header">
+                            <h3>观测技巧</h3>
+                            <span class="card-badge">实践</span>
+                        </div>
+                        <div class="card-body">
+                            <p>学习使用望远镜进行天文观测，掌握天文摄影技巧。</p>
+                            <ul class="lesson-list">
+                                <li>✓ 望远镜使用</li>
+                                <li>✓ 星图识别</li>
+                                <li>✓ 天文摄影</li>
+                            </ul>
+                        </div>
+                        <div class="card-footer">
+                            <button class="btn btn-outline">开始学习</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 天文物理虚拟实验室 -->
+        <section id="lab" class="section lab-section">
+            <div class="container">
+                <h2 class="section-title">
+                    <span class="gradient-text">天文物理虚拟实验室</span>
+                </h2>
+                <div class="lab-container">
+                    <div class="lab-controls">
+                        <div class="control-group">
+                            <h3>模拟类型</h3>
+                            <select id="simulation-type" class="control-select">
+                                <option value="solar-system">太阳系模拟</option>
+                                <option value="orbital-mechanics">轨道力学</option>
+                                <option value="gravity-well">引力井</option>
+                                <option value="stellar-evolution">恒星演化</option>
+                            </select>
+                        </div>
+                        <div id="parameter-controls" class="parameter-controls">
+                            <!-- 动态参数控制将在这里生成 -->
+                        </div>
+                        <div class="control-actions">
+                            <button id="reset-btn" class="btn btn-outline">重置</button>
+                            <button id="play-pause-btn" class="btn btn-primary">暂停</button>
+                        </div>
+                    </div>
+                    <div class="lab-canvas-container">
+                        <canvas id="lab-canvas"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 页脚 -->
+        <footer class="footer">
+            <div class="container">
+                <p>&copy; 2025 北京市第二中学启明星天文社. All rights reserved.</p>
+            </div>
+        </footer>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html>
+
