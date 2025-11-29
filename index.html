@@ -161,26 +161,39 @@
                     <span class="gradient-text">天文物理虚拟实验室</span>
                 </h2>
                 <div class="lab-container">
-                    <div class="lab-controls">
-                        <div class="control-group">
-                            <h3>模拟类型</h3>
-                            <select id="simulation-type" class="control-select">
-                                <option value="solar-system">太阳系模拟</option>
-                                <option value="orbital-mechanics">轨道力学</option>
-                                <option value="gravity-well">引力井</option>
-                                <option value="stellar-evolution">恒星演化</option>
-                            </select>
-                        </div>
-                        <div id="parameter-controls" class="parameter-controls">
-                            <!-- 动态参数控制将在这里生成 -->
-                        </div>
-                        <div class="control-actions">
-                            <button id="reset-btn" class="btn btn-outline">重置</button>
-                            <button id="play-pause-btn" class="btn btn-primary">暂停</button>
-                        </div>
-                    </div>
                     <div class="lab-canvas-container">
                         <canvas id="lab-canvas"></canvas>
+                    </div>
+                    <div class="lab-controls">
+                        <div class="controls-grid">
+                            <div class="control-group">
+                                <h3>模拟类型</h3>
+                                <select id="simulation-type" class="control-select">
+                                    <option value="solar-system">太阳系模拟</option>
+                                    <option value="orbital-mechanics">轨道力学</option>
+                                    <option value="gravity-well">引力井</option>
+                                    <option value="stellar-evolution">恒星演化</option>
+                                    <option value="star-map">北京全年星空</option>
+                                </select>
+                            </div>
+                            <div id="parameter-controls" class="parameter-controls">
+                                <!-- 动态参数控制将在这里生成 -->
+                            </div>
+                            <div class="control-actions">
+                                <button id="reset-btn" class="btn btn-outline">重置</button>
+                                <button id="play-pause-btn" class="btn btn-primary">暂停</button>
+                            </div>
+                        </div>
+                        <div class="control-group control-hint-group">
+                            <div class="control-hint">
+                                <p>💡 <strong>视角控制：</strong></p>
+                                <ul class="hint-list">
+                                    <li>左键拖拽：旋转视角</li>
+                                    <li>滚轮：缩放</li>
+                                    <li>右键拖拽：平移</li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
