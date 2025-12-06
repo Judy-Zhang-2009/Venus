@@ -1,0 +1,21 @@
+{
+  "name": "venus-astronomy-club",
+  "version": "1.0.0",
+  "description": "北京市第二中学启明星天文社官网",
+  "type": "module",
+  "scripts": {
+    "start": "vite",
+    "stop": "node scripts/stop-server.js",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "deploy": "npm run build && wrangler pages deploy dist"
+  },
+  "dependencies": {
+    "three": "^0.160.0"
+  },
+  "devDependencies": {
+    "vite": "^7.2.4",
+    "wrangler": "^4.51.0"
+  }
+}
