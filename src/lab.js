@@ -450,8 +450,15 @@ function initOrbitalMechanics() {
         new THREE.SphereGeometry(1.5, 32, 32),
         new THREE.MeshPhongMaterial({ color: 0xff6b6b })
     );
+    centralBody.userData = { type: 'central-body' };
     scene.add(centralBody);
     simulationObjects.push(centralBody);
+    
+    // 添加中心天体标签
+    const centralLabel = createLabel('中心天体', '#ff6b6b');
+    centralLabel.position.set(0, -1.5 - 0.3, 0);
+    centralBody.add(centralLabel);
+    labelObjects.push(centralLabel);
     
     // 轨道物体
     for (let i = 0; i < 5; i++) {
@@ -471,6 +478,27 @@ function initOrbitalMechanics() {
         };
         scene.add(obj);
         simulationObjects.push(obj);
+        
+        // 创建轨道线
+        const orbitCurve = new THREE.EllipseCurve(
+            0, 0,
+            distance, distance,
+            0, 2 * Math.PI,
+            false,
+            0
+        );
+        const orbitPoints = orbitCurve.getPoints(200);
+        const orbitGeometry = new THREE.BufferGeometry().setFromPoints(
+            orbitPoints.map(p => new THREE.Vector3(p.x, 0, p.y))
+        );
+        const orbitMaterial = new THREE.LineBasicMaterial({
+            color: 0x4ecdc4,
+            transparent: true,
+            opacity: 0.4
+        });
+        const orbitLine = new THREE.Line(orbitGeometry, orbitMaterial);
+        scene.add(orbitLine);
+        simulationObjects.push(orbitLine);
     }
 }
 
@@ -478,6 +506,7 @@ function initOrbitalMechanics() {
 function initGravityWell() {
     // 创建网格平面
     const gridHelper = new THREE.GridHelper(40, 40, 0x444444, 0x222222);
+    gridHelper.userData = { type: 'grid' };
     scene.add(gridHelper);
     simulationObjects.push(gridHelper);
     
@@ -486,8 +515,15 @@ function initGravityWell() {
         new THREE.SphereGeometry(2, 32, 32),
         new THREE.MeshPhongMaterial({ color: 0xff6b6b, emissive: 0xff6b6b, emissiveIntensity: 0.3 })
     );
+    mass.userData = { type: 'central-mass', mass: 1.0 };
     scene.add(mass);
     simulationObjects.push(mass);
+    
+    // 添加中心质量标签
+    const massLabel = createLabel('中心质量', '#ff6b6b');
+    massLabel.position.set(0, -2 - 0.3, 0);
+    mass.add(massLabel);
+    labelObjects.push(massLabel);
     
     // 测试粒子
     for (let i = 0; i < 20; i++) {
@@ -528,10 +564,19 @@ function initStellarEvolution() {
     mainSequence.userData = {
         type: 'star',
         stage: 'main-sequence',
-        age: 0
+        age: 0,
+        manualAge: false, // 是否由用户手动设置年龄
+        baseSize: 1.5,
+        baseColor: 0xffff00
     };
     scene.add(mainSequence);
     simulationObjects.push(mainSequence);
+    
+    // 添加恒星标签
+    const starLabel = createLabel('主序星', '#ffff00');
+    starLabel.position.set(0, -1.5 - 0.3, 0);
+    mainSequence.add(starLabel);
+    labelObjects.push(starLabel);
 }
 
 // 北京全年星空变化模拟
@@ -807,7 +852,10 @@ function updateOrbitalMechanics() {
 }
 
 function updateGravityWell() {
-    const centralMass = simulationObjects.find(obj => obj.userData.type !== 'particle' && obj.userData.type !== 'grid');
+    const centralMass = simulationObjects.find(obj => obj.userData.type === 'central-mass');
+    if (!centralMass) return;
+    
+    const massValue = centralMass.userData.mass || 1.0;
     
     simulationObjects.forEach(obj => {
         if (obj.userData.type === 'particle') {
@@ -816,12 +864,15 @@ function updateGravityWell() {
             const distance = Math.sqrt(dx * dx + dz * dz);
             
             if (distance > 0.5) {
-                const force = 0.1 / (distance * distance);
+                const force = (0.1 * massValue) / (distance * distance);
                 obj.userData.velocity.x += (dx / distance) * force;
                 obj.userData.velocity.z += (dz / distance) * force;
                 
                 obj.position.x += obj.userData.velocity.x;
                 obj.position.z += obj.userData.velocity.z;
+            } else {
+                // 粒子被捕获或碰撞
+                obj.userData.velocity.multiplyScalar(0.5);
             }
         }
     });
@@ -830,10 +881,67 @@ function updateGravityWell() {
 function updateStellarEvolution() {
     simulationObjects.forEach(obj => {
         if (obj.userData.type === 'star') {
-            obj.userData.age += 0.01;
-            // 简单的演化效果
-            const intensity = 0.5 + Math.sin(obj.userData.age) * 0.2;
-            obj.material.emissiveIntensity = intensity;
+            // 如果用户没有手动设置年龄，则自动递增（慢速演化）
+            if (!obj.userData.manualAge) {
+                obj.userData.age = (obj.userData.age || 0) + 0.001;
+            }
+            
+            const age = obj.userData.age || 0;
+            const stage = obj.userData.stage || 'main-sequence';
+            
+            // 根据年龄和阶段更新恒星外观
+            if (stage === 'main-sequence') {
+                if (age < 2) {
+                    // 主序星阶段：黄色，稳定
+                    obj.material.color.setHex(0xffff00);
+                    obj.material.emissive.setHex(0xffff00);
+                    obj.scale.set(1, 1, 1);
+                } else if (age < 4) {
+                    // 红巨星阶段：变大变红
+                    obj.userData.stage = 'red-giant';
+                    obj.material.color.setHex(0xff6600);
+                    obj.material.emissive.setHex(0xff6600);
+                    obj.scale.set(2, 2, 2);
+                } else if (age < 6) {
+                    // 继续膨胀
+                    if (obj.userData.stage === 'red-giant') {
+                        const scale = 2 + (age - 4) * 0.5;
+                        obj.scale.set(scale, scale, scale);
+                    }
+                } else if (age < 8) {
+                    // 白矮星阶段：变小变白
+                    obj.userData.stage = 'white-dwarf';
+                    obj.material.color.setHex(0xffffff);
+                    obj.material.emissive.setHex(0xffffff);
+                    obj.scale.set(0.3, 0.3, 0.3);
+                } else {
+                    // 最终阶段：逐渐冷却
+                    const coolFactor = 1 - (age - 8) * 0.1;
+                    obj.material.emissiveIntensity = Math.max(0.1, 0.8 * coolFactor);
+                }
+            } else if (stage === 'red-giant') {
+                if (age >= 6) {
+                    obj.userData.stage = 'white-dwarf';
+                    obj.material.color.setHex(0xffffff);
+                    obj.material.emissive.setHex(0xffffff);
+                    obj.scale.set(0.3, 0.3, 0.3);
+                } else if (age >= 4) {
+                    // 继续膨胀
+                    const scale = 2 + (age - 4) * 0.5;
+                    obj.scale.set(scale, scale, scale);
+                }
+            } else if (stage === 'white-dwarf') {
+                if (age >= 8) {
+                    // 最终阶段：逐渐冷却
+                    const coolFactor = 1 - (age - 8) * 0.1;
+                    obj.material.emissiveIntensity = Math.max(0.1, 0.8 * coolFactor);
+                }
+            }
+            
+            // 轻微的闪烁效果
+            const twinkle = 0.9 + Math.sin(age * 2) * 0.1;
+            const baseIntensity = obj.material.emissiveIntensity || 0.5;
+            obj.material.emissiveIntensity = baseIntensity * twinkle;
         }
     });
 }
@@ -867,6 +975,7 @@ function updateParameterControls() {
         case 'gravity-well':
             addRangeControl(controlsContainer, 'mass', '中心质量', 0.5, 3, 1, 0.1);
             addRangeControl(controlsContainer, 'particleSpeed', '粒子速度', 0.1, 1, 0.3, 0.1);
+            addButtonControl(controlsContainer, 'resetParticles', '重置粒子');
             break;
         case 'stellar-evolution':
             addRangeControl(controlsContainer, 'starAge', '恒星年龄', 0, 10, 0, 0.1);
@@ -876,8 +985,10 @@ function updateParameterControls() {
             const today = new Date();
             const startOfYear = new Date(today.getFullYear(), 0, 0);
             const dayOfYear = Math.floor((today - startOfYear) / 1000 / 60 / 60 / 24);
-            addRangeControl(controlsContainer, 'dayOfYear', '一年中的第几天', 1, 365, dayOfYear, 1);
-            addRangeControl(controlsContainer, 'hour', '时间（小时）', 0, 23, 20, 1);
+            const currentDay = scene.userData.dayOfYear || dayOfYear;
+            const currentHour = scene.userData.starMapDate ? scene.userData.starMapDate.getHours() : 20;
+            addRangeControl(controlsContainer, 'dayOfYear', '一年中的第几天', 1, 365, currentDay, 1);
+            addRangeControl(controlsContainer, 'hour', '时间（小时）', 0, 23, currentHour, 1);
             break;
     }
 }
@@ -914,6 +1025,25 @@ function addRangeControl(container, id, label, min, max, value, step) {
     container.appendChild(item);
 }
 
+function addButtonControl(container, id, label) {
+    const item = document.createElement('div');
+    item.className = 'parameter-item';
+    
+    const button = document.createElement('button');
+    button.id = id;
+    button.className = 'btn btn-outline';
+    button.textContent = label;
+    button.style.width = '100%';
+    button.style.marginTop = '10px';
+    
+    button.addEventListener('click', () => {
+        updateSimulationParameter(id, 1);
+    });
+    
+    item.appendChild(button);
+    container.appendChild(item);
+}
+
 function updateSimulationParameter(param, value) {
     switch(currentSimulation) {
         case 'solar-system':
@@ -946,22 +1076,69 @@ function updateSimulationParameter(param, value) {
             break;
         case 'gravity-well':
             if (param === 'mass') {
-                const mass = simulationObjects.find(obj => 
-                    obj.material && obj.material.emissive
-                );
+                const mass = simulationObjects.find(obj => obj.userData.type === 'central-mass');
                 if (mass) {
+                    mass.userData.mass = value;
                     mass.scale.set(value, value, value);
                 }
             } else if (param === 'particleSpeed') {
                 simulationObjects.forEach(obj => {
                     if (obj.userData.type === 'particle') {
-                        obj.userData.velocity.multiplyScalar(value / 0.3);
+                        const currentSpeed = obj.userData.velocity.length();
+                        if (currentSpeed > 0) {
+                            obj.userData.velocity.normalize().multiplyScalar(value);
+                        }
+                    }
+                });
+            } else if (param === 'resetParticles') {
+                // 重置粒子位置和速度
+                simulationObjects.forEach(obj => {
+                    if (obj.userData.type === 'particle') {
+                        const angle = Math.random() * Math.PI * 2;
+                        const distance = 15 + Math.random() * 5;
+                        obj.position.set(
+                            Math.cos(angle) * distance,
+                            0,
+                            Math.sin(angle) * distance
+                        );
+                        obj.userData.velocity.set(
+                            -Math.sin(angle) * 0.3,
+                            0,
+                            Math.cos(angle) * 0.3
+                        );
                     }
                 });
             }
             break;
         case 'stellar-evolution':
-            if (param === 'brightness') {
+            if (param === 'starAge') {
+                simulationObjects.forEach(obj => {
+                    if (obj.userData.type === 'star') {
+                        obj.userData.age = value;
+                        obj.userData.manualAge = true; // 标记为用户手动设置
+                        // 立即应用演化效果
+                        const age = value;
+                        if (age < 2) {
+                            obj.userData.stage = 'main-sequence';
+                            obj.material.color.setHex(0xffff00);
+                            obj.material.emissive.setHex(0xffff00);
+                            obj.scale.set(1, 1, 1);
+                        } else if (age < 6) {
+                            obj.userData.stage = 'red-giant';
+                            obj.material.color.setHex(0xff6600);
+                            obj.material.emissive.setHex(0xff6600);
+                            const scale = 2 + (age - 2) * 0.5;
+                            obj.scale.set(scale, scale, scale);
+                        } else {
+                            obj.userData.stage = 'white-dwarf';
+                            obj.material.color.setHex(0xffffff);
+                            obj.material.emissive.setHex(0xffffff);
+                            const scale = Math.max(0.3, 4 - (age - 6) * 0.1);
+                            obj.scale.set(scale, scale, scale);
+                        }
+                    }
+                });
+            } else if (param === 'brightness') {
                 simulationObjects.forEach(obj => {
                     if (obj.userData.type === 'star') {
                         obj.material.emissiveIntensity = value;
@@ -971,12 +1148,16 @@ function updateSimulationParameter(param, value) {
             break;
         case 'star-map':
             if (param === 'dayOfYear' || param === 'hour') {
-                // 重新初始化星空以更新时间
-                const dayOfYear = param === 'dayOfYear' ? Math.floor(value) : scene.userData.dayOfYear || 1;
-                const hour = param === 'hour' ? Math.floor(value) : 20;
+                // 获取当前参数值
+                const dayOfYearInput = document.getElementById('dayOfYear');
+                const hourInput = document.getElementById('hour');
+                const dayOfYear = dayOfYearInput ? Math.floor(parseFloat(dayOfYearInput.value)) : (scene.userData.dayOfYear || 1);
+                const hour = hourInput ? Math.floor(parseFloat(hourInput.value)) : 20;
                 
+                // 创建日期对象
                 const currentDate = new Date();
-                currentDate.setMonth(0, dayOfYear);
+                currentDate.setMonth(0, 1); // 设置为1月1日
+                currentDate.setDate(dayOfYear);
                 currentDate.setHours(hour, 0, 0, 0);
                 
                 scene.userData.starMapDate = currentDate;
@@ -984,23 +1165,36 @@ function updateSimulationParameter(param, value) {
                 
                 updateStarMapTime(currentDate);
                 
-                // 更新星星位置（简化：只更新主要星星）
+                // 更新所有星星位置
                 const beijingLat = 39.9042 * Math.PI / 180;
                 const beijingLon = 116.4074 * Math.PI / 180;
                 const localSiderealTime = calculateLST(dayOfYear, beijingLon);
                 
                 simulationObjects.forEach(obj => {
-                    if (obj.userData.type === 'star' && obj.userData.ra !== undefined) {
-                        const hourAngle = localSiderealTime - obj.userData.ra;
+                    if ((obj.userData.type === 'star' || obj.userData.type === 'background-star') && obj.userData.ra !== undefined) {
+                        const ra = obj.userData.ra;
+                        const dec = obj.userData.dec;
+                        
+                        const hourAngle = localSiderealTime - ra;
                         const hourAngleRad = hourAngle * Math.PI / 12;
-                        const decRad = obj.userData.dec * Math.PI / 180;
+                        const decRad = dec * Math.PI / 180;
                         
                         const sinAlt = Math.sin(beijingLat) * Math.sin(decRad) + 
                                       Math.cos(beijingLat) * Math.cos(decRad) * Math.cos(hourAngleRad);
-                        const alt = Math.asin(sinAlt);
+                        const alt = Math.asin(Math.max(-1, Math.min(1, sinAlt))); // 限制在有效范围内
+                        
+                        let az;
                         const cosAz = (Math.sin(decRad) - Math.sin(beijingLat) * sinAlt) / 
                                       (Math.cos(beijingLat) * Math.cos(alt));
-                        const az = Math.acos(cosAz);
+                        if (Math.abs(cosAz) <= 1) {
+                            az = Math.acos(Math.max(-1, Math.min(1, cosAz)));
+                            // 根据时角确定方位角象限
+                            if (hourAngleRad < 0) {
+                                az = 2 * Math.PI - az;
+                            }
+                        } else {
+                            az = 0;
+                        }
                         
                         const radius = 45;
                         const x = radius * Math.cos(alt) * Math.sin(az);
@@ -1009,11 +1203,13 @@ function updateSimulationParameter(param, value) {
                         
                         obj.position.set(x, y, z);
                         
-                        // 更新标签位置
-                        if (obj.children && obj.children.length > 0) {
-                            obj.children.forEach(child => {
-                                if (child.isCSS2DObject) {
-                                    child.position.set(x * 1.05, y * 1.05, z * 1.05);
+                        // 更新标签位置（仅对主要星星）
+                        if (obj.userData.type === 'star' && obj.userData.mag < 2.0) {
+                            // 查找对应的标签
+                            labelObjects.forEach(label => {
+                                if (label.parent === obj || (label.position && 
+                                    Math.abs(label.position.x - x * 1.05) < 0.1)) {
+                                    label.position.set(x * 1.05, y * 1.05, z * 1.05);
                                 }
                             });
                         }
