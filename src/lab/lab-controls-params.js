@@ -1,8 +1,14 @@
 import * as THREE from 'three';
 import { currentSimulation, scene, simulationObjects, labelObjects, camera, controls } from './lab-core.js';
 import { calculateLST, updateStarMapTime } from './lab-star-map.js';
+import { updateStarGlow } from './lab-stellar-evolution-glow.js';
 
-// 更新模拟参数
+/**
+ * 更新模拟参数
+ * 所有参数更新完全基于传入的滑块值，不依赖硬编码默认值
+ * @param {string} param - 参数名称
+ * @param {number} value - 参数值（来自滑块）
+ */
 export function updateSimulationParameter(param, value) {
     switch(currentSimulation) {
         case 'solar-system':
@@ -23,6 +29,11 @@ export function updateSimulationParameter(param, value) {
     }
 }
 
+/**
+ * 更新太阳系模拟参数
+ * @param {string} param - 参数名称
+ * @param {number} value - 参数值（来自滑块）
+ */
 function updateSolarSystemParameter(param, value) {
     if (param === 'speed') {
         simulationObjects.forEach(obj => {
@@ -31,17 +42,22 @@ function updateSolarSystemParameter(param, value) {
             }
         });
     } else if (param === 'cameraDistance') {
-        const direction = new THREE.Vector3();
-        camera.getWorldDirection(direction);
         const currentDistance = camera.position.length();
-        const newDistance = value;
-        camera.position.multiplyScalar(newDistance / currentDistance);
-        if (controls) {
-            controls.update();
+        if (currentDistance > 0) {
+            const scaleFactor = value / currentDistance;
+            camera.position.multiplyScalar(scaleFactor);
+            if (controls) {
+                controls.update();
+            }
         }
     }
 }
 
+/**
+ * 更新轨道力学模拟参数
+ * @param {string} param - 参数名称
+ * @param {number} value - 参数值（来自滑块）
+ */
 function updateOrbitalMechanicsParameter(param, value) {
     if (param === 'orbitalSpeed') {
         simulationObjects.forEach(obj => {
@@ -52,6 +68,11 @@ function updateOrbitalMechanicsParameter(param, value) {
     }
 }
 
+/**
+ * 更新引力井模拟参数
+ * @param {string} param - 参数名称
+ * @param {number} value - 参数值（来自滑块）
+ */
 function updateGravityWellParameter(param, value) {
     if (param === 'mass') {
         const mass = simulationObjects.find(obj => obj.userData.type === 'central-mass');
@@ -61,10 +82,12 @@ function updateGravityWellParameter(param, value) {
         }
     } else if (param === 'particleSpeed') {
         simulationObjects.forEach(obj => {
-            if (obj.userData.type === 'particle') {
+            if (obj.userData.type === 'particle' && obj.userData.velocity) {
                 const currentSpeed = obj.userData.velocity.length();
                 if (currentSpeed > 0) {
                     obj.userData.velocity.normalize().multiplyScalar(value);
+                } else {
+                    obj.userData.velocity.set(value, 0, 0);
                 }
             }
         });
@@ -78,73 +101,122 @@ function updateGravityWellParameter(param, value) {
                     0,
                     Math.sin(angle) * distance
                 );
+                const speedInput = document.getElementById('particleSpeed');
+                const speed = speedInput ? parseFloat(speedInput.value) : 0.3;
                 obj.userData.velocity.set(
-                    -Math.sin(angle) * 0.3,
+                    -Math.sin(angle) * speed,
                     0,
-                    Math.cos(angle) * 0.3
+                    Math.cos(angle) * speed
                 );
             }
         });
     }
 }
 
+/**
+ * 更新恒星演化模拟参数
+ * 光晕颜色从恒星材质动态获取，确保颜色耦合
+ * @param {string} param - 参数名称
+ * @param {number} value - 参数值（来自滑块）
+ */
 function updateStellarEvolutionParameter(param, value) {
     if (param === 'starAge') {
         simulationObjects.forEach(obj => {
             if (obj.userData.type === 'star') {
                 obj.userData.age = value;
                 obj.userData.manualAge = true;
+                
                 const age = value;
-                let currentColor = 0xffff00;
+                let currentColor;
                 if (age < 2) {
                     obj.userData.stage = 'main-sequence';
                     currentColor = 0xffff00;
-                    obj.material.color.setHex(currentColor);
-                    obj.material.emissive.setHex(currentColor);
+                    if (obj.material && obj.material.color) {
+                        obj.material.color.setHex(currentColor);
+                    }
+                    if (obj.material && obj.material.emissive) {
+                        obj.material.emissive.setHex(currentColor);
+                    }
                     obj.scale.set(1, 1, 1);
                 } else if (age < 6) {
                     obj.userData.stage = 'red-giant';
                     currentColor = 0xff6600;
-                    obj.material.color.setHex(currentColor);
-                    obj.material.emissive.setHex(currentColor);
+                    if (obj.material && obj.material.color) {
+                        obj.material.color.setHex(currentColor);
+                    }
+                    if (obj.material && obj.material.emissive) {
+                        obj.material.emissive.setHex(currentColor);
+                    }
                     const scale = 2 + (age - 2) * 0.5;
                     obj.scale.set(scale, scale, scale);
                 } else {
                     obj.userData.stage = 'white-dwarf';
                     currentColor = 0xffffff;
-                    obj.material.color.setHex(currentColor);
-                    obj.material.emissive.setHex(currentColor);
+                    if (obj.material && obj.material.color) {
+                        obj.material.color.setHex(currentColor);
+                    }
+                    if (obj.material && obj.material.emissive) {
+                        obj.material.emissive.setHex(currentColor);
+                    }
                     const scale = Math.max(0.3, 4 - (age - 6) * 0.1);
                     obj.scale.set(scale, scale, scale);
                 }
                 
-                // 更新光晕
                 if (obj.userData.glow) {
-                    const currentSize = (obj.userData.baseSize || 1.5) * obj.scale.x;
-                    const brightness = obj.userData.brightness || obj.material.emissiveIntensity || 0.5;
-                    updateStarGlow(obj.userData.glow, currentSize, currentColor, brightness);
+                    const baseSize = obj.userData.baseSize || 1.5;
+                    const currentSize = baseSize * obj.scale.x;
+                    const brightnessInput = document.getElementById('brightness');
+                    const brightness = brightnessInput ? parseFloat(brightnessInput.value) : (obj.userData.brightness || 0.5);
+                    
+                    // 从材质动态获取颜色，如果emissive不存在则使用color或baseColor
+                    let starColor;
+                    if (obj.material && obj.material.emissive && typeof obj.material.emissive.getHex === 'function') {
+                        starColor = obj.material.emissive.getHex();
+                    } else if (obj.material && obj.material.color && typeof obj.material.color.getHex === 'function') {
+                        starColor = obj.material.color.getHex();
+                    } else {
+                        starColor = currentColor || obj.userData.baseColor || 0xffff00;
+                    }
+                    
+                    updateStarGlow(obj.userData.glow, currentSize, starColor, brightness);
                 }
             }
         });
     } else if (param === 'brightness') {
         simulationObjects.forEach(obj => {
             if (obj.userData.type === 'star') {
-                obj.material.emissiveIntensity = value;
+                if (obj.material) {
+                    obj.material.emissiveIntensity = value;
+                }
                 obj.userData.brightness = value;
-                obj.userData.manualBrightness = true; // 标记为用户手动设置
+                obj.userData.manualBrightness = true;
                 
-                // 更新光晕大小（亮度控制光晕半径）
                 if (obj.userData.glow) {
                     const baseSize = obj.userData.baseSize || 1.5;
                     const currentSize = baseSize * obj.scale.x;
-                    const currentColor = obj.material.emissive.getHex();
-                    updateStarGlow(obj.userData.glow, currentSize, currentColor, value);
+                    
+                    // 从材质动态获取颜色，如果emissive不存在则使用color或baseColor
+                    let starColor;
+                    if (obj.material && obj.material.emissive && typeof obj.material.emissive.getHex === 'function') {
+                        starColor = obj.material.emissive.getHex();
+                    } else if (obj.material && obj.material.color && typeof obj.material.color.getHex === 'function') {
+                        starColor = obj.material.color.getHex();
+                    } else {
+                        starColor = obj.userData.baseColor || 0xffff00;
+                    }
+                    
+                    updateStarGlow(obj.userData.glow, currentSize, starColor, value);
                 }
             }
         });
     }
 }
 
+/**
+ * 更新星空图模拟参数
+ * @param {string} param - 参数名称
+ * @param {number} value - 参数值（来自滑块）
+ */
 function updateStarMapParameter(param, value) {
     if (param === 'dayOfYear' || param === 'hour') {
         const dayOfYearInput = document.getElementById('dayOfYear');

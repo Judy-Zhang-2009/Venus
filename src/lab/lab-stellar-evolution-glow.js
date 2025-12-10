@@ -1,17 +1,23 @@
 import * as THREE from 'three';
 import { scene, simulationObjects } from './lab-core.js';
 
-// 创建恒星光晕效果
+/**
+ * 创建恒星光晕效果
+ * 光晕颜色与恒星颜色耦合，光晕半径由亮度参数控制
+ * @param {number} starSize - 恒星基础大小
+ * @param {number} starColor - 恒星颜色（十六进制）
+ * @param {number} brightness - 亮度值（控制光晕半径）
+ * @returns {THREE.Points} 光晕点对象
+ */
 export function createStarGlow(starSize, starColor, brightness = 0.5) {
-    // 将颜色转换为RGB (0-1范围)
     const r = ((starColor >> 16) & 0xff) / 255.0;
     const g = ((starColor >> 8) & 0xff) / 255.0;
     const b = (starColor & 0xff) / 255.0;
     
     const glowPositions = new Float32Array([0, 0, 0]);
     const glowColors = new Float32Array([r, g, b]);
-    // 光晕大小 = 恒星大小 * 亮度 * 倍数
-    const glowSize = starSize * brightness * 5.0;
+    const GLOW_SIZE_MULTIPLIER = 5.0;
+    const glowSize = starSize * brightness * GLOW_SIZE_MULTIPLIER;
     const glowSizes = new Float32Array([glowSize]);
     
     const glowGeometry = new THREE.BufferGeometry();
@@ -118,11 +124,18 @@ export function createStarGlow(starSize, starColor, brightness = 0.5) {
     return glow;
 }
 
-// 更新恒星光晕
+/**
+ * 更新恒星光晕
+ * 光晕颜色从恒星颜色动态获取，确保颜色耦合
+ * 光晕半径由亮度参数控制：radius = starSize * brightness * multiplier
+ * @param {THREE.Points} glow - 光晕点对象
+ * @param {number} starSize - 恒星当前大小（考虑缩放）
+ * @param {number} starColor - 恒星当前颜色（从材质获取）
+ * @param {number} brightness - 亮度值（来自滑块，控制光晕半径）
+ */
 export function updateStarGlow(glow, starSize, starColor, brightness) {
     if (!glow || !glow.userData || glow.userData.type !== 'star-glow') return;
     
-    // 更新颜色
     const r = ((starColor >> 16) & 0xff) / 255.0;
     const g = ((starColor >> 8) & 0xff) / 255.0;
     const b = (starColor & 0xff) / 255.0;
@@ -133,8 +146,8 @@ export function updateStarGlow(glow, starSize, starColor, brightness) {
     colorAttribute.array[2] = b;
     colorAttribute.needsUpdate = true;
     
-    // 更新大小：光晕半径 = 恒星大小 * 亮度 * 倍数
-    const glowSize = starSize * brightness * 5.0;
+    const GLOW_SIZE_MULTIPLIER = 5.0;
+    const glowSize = starSize * brightness * GLOW_SIZE_MULTIPLIER;
     const sizeAttribute = glow.geometry.getAttribute('size');
     sizeAttribute.array[0] = glowSize;
     sizeAttribute.needsUpdate = true;

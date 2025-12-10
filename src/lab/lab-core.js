@@ -8,6 +8,7 @@ import { initGravityWell, updateGravityWell } from './lab-gravity-well.js';
 import { initStellarEvolution, updateStellarEvolution } from './lab-stellar-evolution.js';
 import { initStarMap, updateStarMap } from './lab-star-map.js';
 import { updateParameterControls } from './lab-controls.js';
+import { getSimulationTypeFromURL, updateURLSimulationType } from './lab-url.js';
 
 // 全局状态变量
 export let scene, camera, renderer;
@@ -80,8 +81,24 @@ export function initLab() {
     controls.zoomSpeed = 1.0; // 缩放速度
     controls.panSpeed = 0.8; // 平移速度
     
+    // 从URL参数读取模拟类型，如果不存在则使用默认值
+    const urlSimulationType = getSimulationTypeFromURL();
+    const initialSimulationType = urlSimulationType || 'solar-system';
+    currentSimulation = initialSimulationType;
+    
+    // 如果URL中没有参数，则设置默认值到URL
+    if (!urlSimulationType) {
+        updateURLSimulationType(initialSimulationType);
+    }
+    
+    // 同步选择器值
+    const simulationTypeSelect = document.getElementById('simulation-type');
+    if (simulationTypeSelect) {
+        simulationTypeSelect.value = initialSimulationType;
+    }
+    
     // 初始化模拟
-    initSimulation('solar-system');
+    initSimulation(initialSimulationType);
     
     // 开始动画循环
     animate();
@@ -124,7 +141,10 @@ export function animate() {
     }
 }
 
-// 初始化模拟
+/**
+ * 初始化模拟
+ * @param {string} type - 模拟类型
+ */
 export function initSimulation(type) {
     clearSimulation();
     currentSimulation = type;
@@ -144,6 +164,11 @@ export function initSimulation(type) {
             break;
         case 'star-map':
             initStarMap();
+            break;
+        default:
+            console.warn(`Unknown simulation type: ${type}, using solar-system`);
+            currentSimulation = 'solar-system';
+            initSolarSystem();
             break;
     }
     

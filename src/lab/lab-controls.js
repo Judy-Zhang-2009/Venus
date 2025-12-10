@@ -1,29 +1,39 @@
-import { currentSimulation, scene, isPlaying, setPlaying } from './lab-core.js';
+import { currentSimulation, scene, simulationObjects, camera, controls, isPlaying, setPlaying } from './lab-core.js';
 import { initSimulation } from './lab-core.js';
 import { updateSimulationParameter } from './lab-controls-params.js';
+import { updateURLSimulationType, initURLListener, getSimulationTypeFromURL } from './lab-url.js';
 
-// 更新参数控制面板
+/**
+ * 更新参数控制面板
+ * 从当前模拟状态读取初始值，确保滑块位置与实际状态一致
+ */
 export function updateParameterControls() {
     const controlsContainer = document.getElementById('parameter-controls');
     controlsContainer.innerHTML = '';
     
     switch(currentSimulation) {
         case 'solar-system':
-            addRangeControl(controlsContainer, 'speed', '运行速度', 0.1, 2, 1, 0.1);
-            addRangeControl(controlsContainer, 'cameraDistance', '视角距离', 30, 100, 50, 1);
+            const speedValue = getSolarSystemSpeed();
+            const cameraDistValue = getCameraDistance();
+            addRangeControl(controlsContainer, 'speed', '运行速度', 0.1, 2, speedValue, 0.1);
+            addRangeControl(controlsContainer, 'cameraDistance', '视角距离', 30, 100, cameraDistValue, 1);
             break;
         case 'orbital-mechanics':
-            addRangeControl(controlsContainer, 'orbitalSpeed', '轨道速度', 0.01, 0.1, 0.05, 0.01);
-            addRangeControl(controlsContainer, 'gravity', '引力强度', 0.5, 2, 1, 0.1);
+            const orbitalSpeedValue = getOrbitalSpeed();
+            addRangeControl(controlsContainer, 'orbitalSpeed', '轨道速度', 0.01, 0.1, orbitalSpeedValue, 0.01);
             break;
         case 'gravity-well':
-            addRangeControl(controlsContainer, 'mass', '中心质量', 0.5, 3, 1, 0.1);
-            addRangeControl(controlsContainer, 'particleSpeed', '粒子速度', 0.1, 1, 0.3, 0.1);
+            const massValue = getGravityWellMass();
+            const particleSpeedValue = getParticleSpeed();
+            addRangeControl(controlsContainer, 'mass', '中心质量', 0.5, 3, massValue, 0.1);
+            addRangeControl(controlsContainer, 'particleSpeed', '粒子速度', 0.1, 1, particleSpeedValue, 0.1);
             addButtonControl(controlsContainer, 'resetParticles', '重置粒子');
             break;
         case 'stellar-evolution':
-            addRangeControl(controlsContainer, 'starAge', '恒星年龄', 0, 10, 0, 0.1);
-            addRangeControl(controlsContainer, 'brightness', '亮度', 0.3, 1, 0.5, 0.1);
+            const starAgeValue = getStarAge();
+            const brightnessValue = getStarBrightness();
+            addRangeControl(controlsContainer, 'starAge', '恒星年龄', 0, 10, starAgeValue, 0.1);
+            addRangeControl(controlsContainer, 'brightness', '亮度', 0.3, 1, brightnessValue, 0.1);
             break;
         case 'star-map':
             const today = new Date();
@@ -37,6 +47,97 @@ export function updateParameterControls() {
     }
 }
 
+/**
+ * 从当前模拟状态读取太阳系运行速度
+ */
+function getSolarSystemSpeed() {
+    const planet = simulationObjects.find(obj => obj.userData.type === 'planet');
+    if (planet && planet.userData.speed !== undefined) {
+        return planet.userData.speed * 100;
+    }
+    return 1.0;
+}
+
+/**
+ * 从当前相机状态读取距离
+ */
+function getCameraDistance() {
+    if (camera) {
+        return camera.position.length();
+    }
+    return 50;
+}
+
+/**
+ * 从当前模拟状态读取轨道速度
+ */
+function getOrbitalSpeed() {
+    const orbital = simulationObjects.find(obj => obj.userData.type === 'orbital');
+    if (orbital && orbital.userData.speed !== undefined) {
+        return orbital.userData.speed;
+    }
+    return 0.05;
+}
+
+/**
+ * 从当前模拟状态读取中心质量
+ */
+function getGravityWellMass() {
+    const mass = simulationObjects.find(obj => obj.userData.type === 'central-mass');
+    if (mass && mass.userData.mass !== undefined) {
+        return mass.userData.mass;
+    }
+    return 1.0;
+}
+
+/**
+ * 从当前模拟状态读取粒子速度
+ */
+function getParticleSpeed() {
+    const particle = simulationObjects.find(obj => obj.userData.type === 'particle');
+    if (particle && particle.userData.velocity) {
+        return particle.userData.velocity.length();
+    }
+    return 0.3;
+}
+
+/**
+ * 从当前模拟状态读取恒星年龄
+ */
+function getStarAge() {
+    const star = simulationObjects.find(obj => obj.userData.type === 'star');
+    if (star && star.userData.age !== undefined) {
+        return star.userData.age;
+    }
+    return 0;
+}
+
+/**
+ * 从当前模拟状态读取恒星亮度
+ */
+function getStarBrightness() {
+    const star = simulationObjects.find(obj => obj.userData.type === 'star');
+    if (star) {
+        if (star.userData.brightness !== undefined) {
+            return star.userData.brightness;
+        }
+        if (star.material && star.material.emissiveIntensity !== undefined) {
+            return star.material.emissiveIntensity;
+        }
+    }
+    return 0.5;
+}
+
+/**
+ * 添加范围滑块控制
+ * @param {HTMLElement} container - 容器元素
+ * @param {string} id - 控件ID
+ * @param {string} label - 标签文本
+ * @param {number} min - 最小值
+ * @param {number} max - 最大值
+ * @param {number} value - 初始值（从当前状态读取）
+ * @param {number} step - 步进值
+ */
 function addRangeControl(container, id, label, min, max, value, step) {
     const item = document.createElement('div');
     item.className = 'parameter-item';
@@ -55,11 +156,11 @@ function addRangeControl(container, id, label, min, max, value, step) {
     
     const valueDisplay = document.createElement('div');
     valueDisplay.className = 'value-display';
-    valueDisplay.textContent = value;
+    valueDisplay.textContent = value.toFixed(step < 1 ? 2 : 0);
     
     input.addEventListener('input', (e) => {
         const val = parseFloat(e.target.value);
-        valueDisplay.textContent = val.toFixed(2);
+        valueDisplay.textContent = val.toFixed(step < 1 ? 2 : 0);
         updateSimulationParameter(id, val);
     });
     
@@ -69,6 +170,12 @@ function addRangeControl(container, id, label, min, max, value, step) {
     container.appendChild(item);
 }
 
+/**
+ * 添加按钮控制
+ * @param {HTMLElement} container - 容器元素
+ * @param {string} id - 控件ID
+ * @param {string} label - 按钮文本
+ */
 function addButtonControl(container, id, label) {
     const item = document.createElement('div');
     item.className = 'parameter-item';
@@ -89,10 +196,29 @@ function addButtonControl(container, id, label) {
 }
 
 
-// 事件监听
+/**
+ * 设置事件监听器
+ */
 export function setupEventListeners() {
-    document.getElementById('simulation-type').addEventListener('change', (e) => {
-        initSimulation(e.target.value);
+    const simulationTypeSelect = document.getElementById('simulation-type');
+    
+    if (!simulationTypeSelect) {
+        return;
+    }
+    
+    // 监听模拟类型切换
+    simulationTypeSelect.addEventListener('change', (e) => {
+        const newType = e.target.value;
+        initSimulation(newType);
+        updateURLSimulationType(newType);
+    });
+    
+    // 初始化URL监听（处理浏览器前进/后退）
+    initURLListener((simulationType) => {
+        if (simulationTypeSelect) {
+            simulationTypeSelect.value = simulationType;
+        }
+        initSimulation(simulationType);
     });
     
     document.getElementById('reset-btn').addEventListener('click', () => {
@@ -114,5 +240,16 @@ export function setupEventListeners() {
         setPlaying(newValue);
         e.target.textContent = newValue ? '暂停' : '播放';
     });
+}
+
+/**
+ * 同步选择器值与当前模拟类型
+ * 在初始化完成后调用，确保UI与状态一致
+ */
+export function syncSimulationTypeSelect() {
+    const simulationTypeSelect = document.getElementById('simulation-type');
+    if (simulationTypeSelect) {
+        simulationTypeSelect.value = currentSimulation;
+    }
 }
 
