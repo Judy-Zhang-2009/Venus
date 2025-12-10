@@ -95,23 +95,34 @@ function updateStellarEvolutionParameter(param, value) {
                 obj.userData.age = value;
                 obj.userData.manualAge = true;
                 const age = value;
+                let currentColor = 0xffff00;
                 if (age < 2) {
                     obj.userData.stage = 'main-sequence';
-                    obj.material.color.setHex(0xffff00);
-                    obj.material.emissive.setHex(0xffff00);
+                    currentColor = 0xffff00;
+                    obj.material.color.setHex(currentColor);
+                    obj.material.emissive.setHex(currentColor);
                     obj.scale.set(1, 1, 1);
                 } else if (age < 6) {
                     obj.userData.stage = 'red-giant';
-                    obj.material.color.setHex(0xff6600);
-                    obj.material.emissive.setHex(0xff6600);
+                    currentColor = 0xff6600;
+                    obj.material.color.setHex(currentColor);
+                    obj.material.emissive.setHex(currentColor);
                     const scale = 2 + (age - 2) * 0.5;
                     obj.scale.set(scale, scale, scale);
                 } else {
                     obj.userData.stage = 'white-dwarf';
-                    obj.material.color.setHex(0xffffff);
-                    obj.material.emissive.setHex(0xffffff);
+                    currentColor = 0xffffff;
+                    obj.material.color.setHex(currentColor);
+                    obj.material.emissive.setHex(currentColor);
                     const scale = Math.max(0.3, 4 - (age - 6) * 0.1);
                     obj.scale.set(scale, scale, scale);
+                }
+                
+                // 更新光晕
+                if (obj.userData.glow) {
+                    const currentSize = (obj.userData.baseSize || 1.5) * obj.scale.x;
+                    const brightness = obj.userData.brightness || obj.material.emissiveIntensity || 0.5;
+                    updateStarGlow(obj.userData.glow, currentSize, currentColor, brightness);
                 }
             }
         });
@@ -119,6 +130,16 @@ function updateStellarEvolutionParameter(param, value) {
         simulationObjects.forEach(obj => {
             if (obj.userData.type === 'star') {
                 obj.material.emissiveIntensity = value;
+                obj.userData.brightness = value;
+                obj.userData.manualBrightness = true; // 标记为用户手动设置
+                
+                // 更新光晕大小（亮度控制光晕半径）
+                if (obj.userData.glow) {
+                    const baseSize = obj.userData.baseSize || 1.5;
+                    const currentSize = baseSize * obj.scale.x;
+                    const currentColor = obj.material.emissive.getHex();
+                    updateStarGlow(obj.userData.glow, currentSize, currentColor, value);
+                }
             }
         });
     }
