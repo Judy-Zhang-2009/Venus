@@ -3,22 +3,28 @@ import { scene, simulationObjects } from './lab-core.js';
 
 /**
  * 创建恒星光晕效果
- * 光晕颜色与恒星颜色耦合，光晕半径由亮度参数控制
- * @param {number} starSize - 恒星基础大小
- * @param {number} starColor - 恒星颜色（十六进制）
- * @param {number} brightness - 亮度值（控制光晕半径）
+ * 光晕颜色与恒星颜色耦合，光晕半径与恒星实际半径耦合
+ * 光晕半径计算公式：glowRadius = starRadius * (1 + brightness * GLOW_RADIUS_MULTIPLIER)
+ * @param {number} starRadius - 恒星当前半径（考虑缩放后的实际半径）
+ * @param {number} starColor - 恒星颜色（十六进制RGB值）
+ * @param {number} brightness - 亮度参数（范围0-1，控制光晕相对于恒星半径的扩展倍数）
  * @returns {THREE.Points} 光晕点对象
  */
-export function createStarGlow(starSize, starColor, brightness = 0.5) {
+export function createStarGlow(starRadius, starColor, brightness = 0.5) {
+    // 将十六进制颜色值转换为RGB分量（归一化到0-1范围）
     const r = ((starColor >> 16) & 0xff) / 255.0;
     const g = ((starColor >> 8) & 0xff) / 255.0;
     const b = (starColor & 0xff) / 255.0;
     
     const glowPositions = new Float32Array([0, 0, 0]);
     const glowColors = new Float32Array([r, g, b]);
-    const GLOW_SIZE_MULTIPLIER = 5.0;
-    const glowSize = starSize * brightness * GLOW_SIZE_MULTIPLIER;
-    const glowSizes = new Float32Array([glowSize]);
+    
+    // 光晕半径扩展倍数：亮度为1时，光晕半径为恒星半径的6倍
+    const GLOW_RADIUS_MULTIPLIER = 5.0;
+    // 光晕半径 = 恒星半径 * (1 + 亮度 * 扩展倍数)
+    // 当brightness=0时，光晕半径=恒星半径；当brightness=1时，光晕半径=恒星半径*6
+    const glowRadius = starRadius * (1.0 + brightness * GLOW_RADIUS_MULTIPLIER);
+    const glowSizes = new Float32Array([glowRadius]);
     
     const glowGeometry = new THREE.BufferGeometry();
     glowGeometry.setAttribute('position', new THREE.BufferAttribute(glowPositions, 3));
@@ -117,7 +123,12 @@ export function createStarGlow(starSize, starColor, brightness = 0.5) {
     });
     
     const glow = new THREE.Points(glowGeometry, glowMaterial);
-    glow.userData = { type: 'star-glow', baseSize: glowSize };
+    glow.userData = { 
+        type: 'star-glow', 
+        baseRadius: glowRadius,
+        starRadius: starRadius,
+        brightness: brightness
+    };
     scene.add(glow);
     simulationObjects.push(glow);
     
@@ -125,32 +136,47 @@ export function createStarGlow(starSize, starColor, brightness = 0.5) {
 }
 
 /**
- * 更新恒星光晕
- * 光晕颜色从恒星颜色动态获取，确保颜色耦合
- * 光晕半径由亮度参数控制：radius = starSize * brightness * multiplier
+ * 更新恒星光晕属性
+ * 光晕颜色从恒星材质动态获取，确保颜色耦合
+ * 光晕半径与恒星实际半径耦合，计算公式：glowRadius = starRadius * (1 + brightness * GLOW_RADIUS_MULTIPLIER)
  * @param {THREE.Points} glow - 光晕点对象
- * @param {number} starSize - 恒星当前大小（考虑缩放）
- * @param {number} starColor - 恒星当前颜色（从材质获取）
- * @param {number} brightness - 亮度值（来自滑块，控制光晕半径）
+ * @param {number} starRadius - 恒星当前实际半径（baseSize * scale.x，考虑缩放后的半径）
+ * @param {number} starColor - 恒星当前颜色值（从材质emissive或color属性获取的十六进制RGB值）
+ * @param {number} brightness - 亮度参数值（范围0-1，控制光晕相对于恒星半径的扩展倍数）
  */
-export function updateStarGlow(glow, starSize, starColor, brightness) {
-    if (!glow || !glow.userData || glow.userData.type !== 'star-glow') return;
+export function updateStarGlow(glow, starRadius, starColor, brightness) {
+    if (!glow || !glow.userData || glow.userData.type !== 'star-glow') {
+        return;
+    }
     
+    // 更新光晕颜色：将十六进制颜色值转换为RGB分量
     const r = ((starColor >> 16) & 0xff) / 255.0;
     const g = ((starColor >> 8) & 0xff) / 255.0;
     const b = (starColor & 0xff) / 255.0;
     
     const colorAttribute = glow.geometry.getAttribute('color');
-    colorAttribute.array[0] = r;
-    colorAttribute.array[1] = g;
-    colorAttribute.array[2] = b;
-    colorAttribute.needsUpdate = true;
+    if (colorAttribute) {
+        colorAttribute.array[0] = r;
+        colorAttribute.array[1] = g;
+        colorAttribute.array[2] = b;
+        colorAttribute.needsUpdate = true;
+    }
     
-    const GLOW_SIZE_MULTIPLIER = 5.0;
-    const glowSize = starSize * brightness * GLOW_SIZE_MULTIPLIER;
+    // 更新光晕半径：与恒星实际半径耦合
+    // 光晕半径扩展倍数：亮度为1时，光晕半径为恒星半径的6倍
+    const GLOW_RADIUS_MULTIPLIER = 5.0;
+    // 光晕半径 = 恒星半径 * (1 + 亮度 * 扩展倍数)
+    const glowRadius = starRadius * (1.0 + brightness * GLOW_RADIUS_MULTIPLIER);
+    
     const sizeAttribute = glow.geometry.getAttribute('size');
-    sizeAttribute.array[0] = glowSize;
-    sizeAttribute.needsUpdate = true;
-    glow.userData.baseSize = glowSize;
+    if (sizeAttribute) {
+        sizeAttribute.array[0] = glowRadius;
+        sizeAttribute.needsUpdate = true;
+    }
+    
+    // 更新光晕对象的用户数据
+    glow.userData.baseRadius = glowRadius;
+    glow.userData.starRadius = starRadius;
+    glow.userData.brightness = brightness;
 }
 

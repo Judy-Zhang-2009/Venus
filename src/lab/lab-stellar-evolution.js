@@ -5,19 +5,19 @@ import { createStarGlow, updateStarGlow } from './lab-stellar-evolution-glow.js'
 
 /**
  * 初始化恒星演化模拟
- * 创建主序星及其光晕效果
+ * 创建主序星几何体、材质、光晕效果及标签
  */
 export function initStellarEvolution() {
-    const baseSize = 1.5;
-    const initialColor = 0xffff00;
-    const initialBrightness = 0.5;
+    const BASE_RADIUS = 1.5;
+    const INITIAL_COLOR = 0xffff00;
+    const INITIAL_BRIGHTNESS = 0.5;
     
     const mainSequence = new THREE.Mesh(
-        new THREE.SphereGeometry(baseSize, 32, 32),
+        new THREE.SphereGeometry(BASE_RADIUS, 32, 32),
         new THREE.MeshBasicMaterial({ 
-            color: initialColor,
-            emissive: initialColor,
-            emissiveIntensity: initialBrightness
+            color: INITIAL_COLOR,
+            emissive: INITIAL_COLOR,
+            emissiveIntensity: INITIAL_BRIGHTNESS
         })
     );
     mainSequence.userData = {
@@ -26,36 +26,40 @@ export function initStellarEvolution() {
         age: 0,
         manualAge: false,
         manualBrightness: false,
-        baseSize: baseSize,
-        baseColor: initialColor,
-        brightness: initialBrightness
+        baseSize: BASE_RADIUS,
+        baseColor: INITIAL_COLOR,
+        brightness: INITIAL_BRIGHTNESS
     };
     scene.add(mainSequence);
     simulationObjects.push(mainSequence);
     
-    const glow = createStarGlow(baseSize, initialColor, initialBrightness);
+    // 创建光晕：光晕半径与恒星半径耦合
+    const initialStarRadius = BASE_RADIUS * mainSequence.scale.x;
+    const glow = createStarGlow(initialStarRadius, INITIAL_COLOR, INITIAL_BRIGHTNESS);
     mainSequence.userData.glow = glow;
     
     const starLabel = createLabel('主序星', '#ffff00');
-    starLabel.position.set(0, -baseSize - 0.3, 0);
+    starLabel.position.set(0, -BASE_RADIUS - 0.3, 0);
     mainSequence.add(starLabel);
     labelObjects.push(starLabel);
 }
 
 /**
- * 更新恒星演化模拟
- * 光晕颜色从恒星材质动态获取，确保颜色耦合
+ * 更新恒星演化模拟状态
+ * 根据恒星年龄和演化阶段更新恒星外观、大小、颜色
+ * 同步更新光晕颜色和半径，确保光晕与恒星状态耦合
  */
 export function updateStellarEvolution() {
     simulationObjects.forEach(obj => {
         if (obj.userData.type === 'star') {
+            // 自动递增年龄（除非用户手动设置）
             if (!obj.userData.manualAge) {
                 obj.userData.age = (obj.userData.age || 0) + 0.001;
             }
             
             const age = obj.userData.age || 0;
             const stage = obj.userData.stage || 'main-sequence';
-            const baseSize = obj.userData.baseSize || 1.5;
+            const baseRadius = obj.userData.baseSize || 1.5;
             let brightness = obj.userData.brightness;
             
             if (stage === 'main-sequence') {
@@ -132,11 +136,14 @@ export function updateStellarEvolution() {
                 obj.userData.brightness = brightness || baseIntensity;
             }
             
+            // 更新光晕：光晕半径与恒星实际半径耦合
             if (obj.userData.glow) {
-                const currentSize = baseSize * obj.scale.x;
+                // 计算恒星当前实际半径（考虑缩放）
+                const currentStarRadius = baseRadius * obj.scale.x;
+                // 获取当前亮度值（优先使用用户设置值）
                 const glowBrightness = obj.userData.brightness || brightness || 0.5;
                 
-                // 从材质动态获取颜色，如果emissive不存在则使用color或baseColor
+                // 从材质动态获取恒星颜色，确保颜色耦合
                 let starColor;
                 if (obj.material && obj.material.emissive && typeof obj.material.emissive.getHex === 'function') {
                     starColor = obj.material.emissive.getHex();
@@ -146,7 +153,8 @@ export function updateStellarEvolution() {
                     starColor = obj.userData.baseColor || 0xffff00;
                 }
                 
-                updateStarGlow(obj.userData.glow, currentSize, starColor, glowBrightness);
+                // 更新光晕：半径与恒星半径耦合，颜色与恒星颜色耦合
+                updateStarGlow(obj.userData.glow, currentStarRadius, starColor, glowBrightness);
             }
         }
     });

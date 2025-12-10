@@ -162,13 +162,16 @@ function updateStellarEvolutionParameter(param, value) {
                     obj.scale.set(scale, scale, scale);
                 }
                 
+                // 更新光晕：光晕半径与恒星实际半径耦合
                 if (obj.userData.glow) {
-                    const baseSize = obj.userData.baseSize || 1.5;
-                    const currentSize = baseSize * obj.scale.x;
+                    // 计算恒星当前实际半径（考虑缩放）
+                    const baseRadius = obj.userData.baseSize || 1.5;
+                    const currentStarRadius = baseRadius * obj.scale.x;
+                    // 从滑块读取亮度值，如果不存在则使用存储值
                     const brightnessInput = document.getElementById('brightness');
                     const brightness = brightnessInput ? parseFloat(brightnessInput.value) : (obj.userData.brightness || 0.5);
                     
-                    // 从材质动态获取颜色，如果emissive不存在则使用color或baseColor
+                    // 从材质动态获取恒星颜色，确保颜色耦合
                     let starColor;
                     if (obj.material && obj.material.emissive && typeof obj.material.emissive.getHex === 'function') {
                         starColor = obj.material.emissive.getHex();
@@ -178,7 +181,8 @@ function updateStellarEvolutionParameter(param, value) {
                         starColor = currentColor || obj.userData.baseColor || 0xffff00;
                     }
                     
-                    updateStarGlow(obj.userData.glow, currentSize, starColor, brightness);
+                    // 更新光晕：半径与恒星半径耦合，颜色与恒星颜色耦合
+                    updateStarGlow(obj.userData.glow, currentStarRadius, starColor, brightness);
                 }
             }
         });
@@ -191,11 +195,13 @@ function updateStellarEvolutionParameter(param, value) {
                 obj.userData.brightness = value;
                 obj.userData.manualBrightness = true;
                 
+                // 更新光晕：光晕半径与恒星实际半径耦合
                 if (obj.userData.glow) {
-                    const baseSize = obj.userData.baseSize || 1.5;
-                    const currentSize = baseSize * obj.scale.x;
+                    // 计算恒星当前实际半径（考虑缩放）
+                    const baseRadius = obj.userData.baseSize || 1.5;
+                    const currentStarRadius = baseRadius * obj.scale.x;
                     
-                    // 从材质动态获取颜色，如果emissive不存在则使用color或baseColor
+                    // 从材质动态获取恒星颜色，确保颜色耦合
                     let starColor;
                     if (obj.material && obj.material.emissive && typeof obj.material.emissive.getHex === 'function') {
                         starColor = obj.material.emissive.getHex();
@@ -205,7 +211,8 @@ function updateStellarEvolutionParameter(param, value) {
                         starColor = obj.userData.baseColor || 0xffff00;
                     }
                     
-                    updateStarGlow(obj.userData.glow, currentSize, starColor, value);
+                    // 更新光晕：半径与恒星半径耦合，颜色与恒星颜色耦合
+                    updateStarGlow(obj.userData.glow, currentStarRadius, starColor, value);
                 }
             }
         });
