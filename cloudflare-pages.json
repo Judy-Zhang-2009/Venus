@@ -1,0 +1,14 @@
+{
+  "build": {
+    "command": "npm run build",
+    "cwd": ".",
+    "watch": []
+  },
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
+}
+
