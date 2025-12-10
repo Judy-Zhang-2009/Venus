@@ -31,7 +31,9 @@ export function updateParameterControls() {
             break;
         case 'stellar-evolution':
             const starAgeValue = getStarAge();
+            const evolutionSpeedValue = getEvolutionSpeed();
             addRangeControl(controlsContainer, 'starAge', '恒星年龄', 0, 10, starAgeValue, 0.1);
+            addRangeControl(controlsContainer, 'evolutionSpeed', '演化速度', 0.0001, 0.01, evolutionSpeedValue, 0.0001);
             break;
         case 'star-map':
             const today = new Date();
@@ -101,6 +103,7 @@ function getParticleSpeed() {
 
 /**
  * 从当前模拟状态读取恒星年龄
+ * @returns {number} 恒星当前年龄值
  */
 function getStarAge() {
     const star = simulationObjects.find(obj => obj.userData.type === 'star');
@@ -108,6 +111,18 @@ function getStarAge() {
         return star.userData.age;
     }
     return 0;
+}
+
+/**
+ * 从当前模拟状态读取演化速度
+ * @returns {number} 演化速度值
+ */
+function getEvolutionSpeed() {
+    const star = simulationObjects.find(obj => obj.userData.type === 'star');
+    if (star && star.userData.evolutionSpeed !== undefined) {
+        return star.userData.evolutionSpeed;
+    }
+    return 0.01;
 }
 
 
@@ -139,11 +154,25 @@ function addRangeControl(container, id, label, min, max, value, step) {
     
     const valueDisplay = document.createElement('div');
     valueDisplay.className = 'value-display';
-    valueDisplay.textContent = value.toFixed(step < 1 ? 2 : 0);
+    // 根据step值确定显示精度
+    if (step < 0.001) {
+        valueDisplay.textContent = value.toFixed(4);
+    } else if (step < 0.1) {
+        valueDisplay.textContent = value.toFixed(2);
+    } else {
+        valueDisplay.textContent = value.toFixed(step < 1 ? 1 : 0);
+    }
     
     input.addEventListener('input', (e) => {
         const val = parseFloat(e.target.value);
-        valueDisplay.textContent = val.toFixed(step < 1 ? 2 : 0);
+        // 更新显示值
+        if (step < 0.001) {
+            valueDisplay.textContent = val.toFixed(4);
+        } else if (step < 0.1) {
+            valueDisplay.textContent = val.toFixed(2);
+        } else {
+            valueDisplay.textContent = val.toFixed(step < 1 ? 1 : 0);
+        }
         updateSimulationParameter(id, val);
     });
     
@@ -219,6 +248,7 @@ export function setupEventListeners() {
     });
     
     document.getElementById('play-pause-btn').addEventListener('click', (e) => {
+        // 切换播放/暂停状态：控制模拟是否自动更新
         const newValue = !isPlaying;
         setPlaying(newValue);
         e.target.textContent = newValue ? '暂停' : '播放';

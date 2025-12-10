@@ -175,7 +175,11 @@ export function initSimulation(type) {
     updateParameterControls();
 }
 
-// 更新模拟
+/**
+ * 更新当前模拟状态
+ * 根据模拟类型调用相应的更新函数
+ * 仅在播放状态下执行更新操作
+ */
 export function updateSimulation() {
     switch(currentSimulation) {
         case 'solar-system':

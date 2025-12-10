@@ -115,49 +115,75 @@ function updateGravityWellParameter(param, value) {
 
 /**
  * 更新恒星演化模拟参数
- * 光晕颜色从恒星材质动态获取，确保颜色耦合
- * @param {string} param - 参数名称
- * @param {number} value - 参数值（来自滑块）
+ * 处理用户通过滑块设置的演化参数，包括年龄和演化速度
+ * @param {string} param - 参数名称（'starAge' 或 'evolutionSpeed'）
+ * @param {number} value - 参数值（来自滑块输入）
  */
 function updateStellarEvolutionParameter(param, value) {
+    const MAX_AGE = 10.0; // 最大年龄值，与updateStellarEvolution中的定义保持一致
+    
     if (param === 'starAge') {
         simulationObjects.forEach(obj => {
             if (obj.userData.type === 'star') {
-                obj.userData.age = value;
+                // 处理循环播放：当滑块值达到最大值时，重置为0
+                let ageValue = value;
+                if (ageValue >= MAX_AGE) {
+                    ageValue = 0;
+                }
+                obj.userData.age = ageValue;
+                // 设置手动年龄标志：当用户通过滑块设置年龄时，暂停自动演化
                 obj.userData.manualAge = true;
                 
-                const age = value;
+                const age = ageValue;
                 const baseRadius = obj.userData.baseSize || 1.5;
                 let targetScale = 1.0;
                 let currentColor = 0xffff00;
+                
+                // 颜色插值函数：在黄色、橙色、红色和白色之间平滑过渡
+                // 分别处理RGB通道，确保G和B通道变化速度合理，避免出现紫色
+                function interpolateColor(startColor, endColor, progress) {
+                    const startR = (startColor >> 16) & 0xff;
+                    const startG = (startColor >> 8) & 0xff;
+                    const startB = startColor & 0xff;
+                    const endR = (endColor >> 16) & 0xff;
+                    const endG = (endColor >> 8) & 0xff;
+                    const endB = endColor & 0xff;
+                    const deltaR = endR - startR;
+                    const deltaG = endG - startG;
+                    const deltaB = endB - startB;
+                    const r = Math.round(startR + deltaR * progress);
+                    const g = Math.round(startG + deltaG * progress);
+                    const b = Math.round(startB + deltaB * progress);
+                    return (r << 16) | (g << 8) | b;
+                }
                 
                 // 根据年龄计算目标缩放值和颜色（与updateStellarEvolution中的逻辑一致）
                 if (age < 2) {
                     obj.userData.stage = 'main-sequence';
                     targetScale = 1.0;
-                    currentColor = 0xffff00;
+                    currentColor = 0xffff00; // 黄色
                 } else if (age < 4) {
                     obj.userData.stage = 'red-giant';
-                    const transitionProgress = (age - 2) / 2;
+                    const transitionProgress = Math.max(0, Math.min(1, (age - 2) / 2));
                     targetScale = 1.0 + transitionProgress * 1.0;
-                    currentColor = 0xffff00 + Math.floor(transitionProgress * (0xff6600 - 0xffff00));
+                    currentColor = interpolateColor(0xffff00, 0xff6600, transitionProgress);
                 } else if (age < 6) {
                     obj.userData.stage = 'red-giant';
-                    const growthProgress = (age - 4) / 2;
+                    const growthProgress = Math.max(0, Math.min(1, (age - 4) / 2));
                     targetScale = 2.0 + growthProgress * 1.0;
-                    currentColor = 0xff6600;
+                    currentColor = 0xff6600; // 橙色
                 } else if (age < 8) {
                     obj.userData.stage = 'white-dwarf';
-                    const transitionProgress = (age - 6) / 2;
+                    const transitionProgress = Math.max(0, Math.min(1, (age - 6) / 2));
                     const startScale = 3.0;
                     const endScale = 0.3;
                     targetScale = startScale - transitionProgress * (startScale - endScale);
-                    const colorTransition = transitionProgress;
-                    currentColor = 0xff6600 + Math.floor(colorTransition * (0xffffff - 0xff6600));
+                    currentColor = interpolateColor(0xff6600, 0xcc0000, transitionProgress);
                 } else {
                     obj.userData.stage = 'white-dwarf';
                     targetScale = 0.3;
-                    currentColor = 0xffffff;
+                    const coolProgress = Math.max(0, Math.min(1, (age - 8) / 2));
+                    currentColor = interpolateColor(0xcc0000, 0xffffff, coolProgress);
                 }
                 
                 // 立即设置目标缩放值（手动设置时不使用平滑插值）
@@ -189,7 +215,11 @@ function updateStellarEvolutionParameter(param, value) {
                         labelColor = '#ff6600';
                     } else if (stage === 'white-dwarf') {
                         labelText = '白矮星';
-                        labelColor = '#ffffff';
+                        // 标签颜色根据恒星当前颜色动态设置
+                        const r = (currentColor >> 16) & 0xff;
+                        const g = (currentColor >> 8) & 0xff;
+                        const b = currentColor & 0xff;
+                        labelColor = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
                     }
                     
                     // 更新标签文字和颜色
@@ -217,6 +247,14 @@ function updateStellarEvolutionParameter(param, value) {
                     // 更新光晕：半径与恒星半径直接耦合，颜色与恒星颜色耦合
                     updateStarGlow(obj.userData.glow, currentStarRadius, starColor);
                 }
+            }
+        });
+    } else if (param === 'evolutionSpeed') {
+        // 更新演化速度：控制自动演化模式下年龄的递增速率
+        // 注意：修改演化速度不会影响manualAge标志，允许继续自动演化
+        simulationObjects.forEach(obj => {
+            if (obj.userData.type === 'star') {
+                obj.userData.evolutionSpeed = value;
             }
         });
     }
