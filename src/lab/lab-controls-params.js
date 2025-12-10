@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { currentSimulation, scene, simulationObjects, labelObjects, camera, controls } from './lab-core.js';
 import { calculateLST, updateStarMapTime } from './lab-star-map.js';
 import { updateStarGlow } from './lab-stellar-evolution-glow.js';
+import { resetGravityWell } from './lab-gravity-well.js';
 
 /**
  * 更新模拟参数
@@ -31,25 +32,18 @@ export function updateSimulationParameter(param, value) {
 
 /**
  * 更新太阳系模拟参数
- * @param {string} param - 参数名称
- * @param {number} value - 参数值（来自滑块）
+ * 根据参数名称更新相应的模拟状态
+ * @param {string} param - 参数名称（'speed'）
+ * @param {number} value - 参数值（来自滑块输入）
  */
 function updateSolarSystemParameter(param, value) {
     if (param === 'speed') {
+        // 更新行星运行速度：将滑块值转换为实际速度值
         simulationObjects.forEach(obj => {
             if (obj.userData.type === 'planet') {
                 obj.userData.speed = value * 0.01;
             }
         });
-    } else if (param === 'cameraDistance') {
-        const currentDistance = camera.position.length();
-        if (currentDistance > 0) {
-            const scaleFactor = value / currentDistance;
-            camera.position.multiplyScalar(scaleFactor);
-            if (controls) {
-                controls.update();
-            }
-        }
     }
 }
 
@@ -70,46 +64,32 @@ function updateOrbitalMechanicsParameter(param, value) {
 
 /**
  * 更新引力井模拟参数
- * @param {string} param - 参数名称
- * @param {number} value - 参数值（来自滑块）
+ * 处理用户通过滑块设置的初始速度参数
+ * @param {string} param - 参数名称（'initialSpeed'）
+ * @param {number} value - 参数值（来自滑块输入）
  */
 function updateGravityWellParameter(param, value) {
-    if (param === 'mass') {
-        const mass = simulationObjects.find(obj => obj.userData.type === 'central-mass');
-        if (mass) {
-            mass.userData.mass = value;
-            mass.scale.set(value, value, value);
+    if (param === 'ballAMass') {
+        // 更新A球质量
+        const ballA = simulationObjects.find(obj => obj.userData.type === 'gravity-ball' && obj.userData.ballName === 'A');
+        if (ballA) {
+            ballA.userData.mass = value;
         }
-    } else if (param === 'particleSpeed') {
-        simulationObjects.forEach(obj => {
-            if (obj.userData.type === 'particle' && obj.userData.velocity) {
-                const currentSpeed = obj.userData.velocity.length();
-                if (currentSpeed > 0) {
-                    obj.userData.velocity.normalize().multiplyScalar(value);
-                } else {
-                    obj.userData.velocity.set(value, 0, 0);
-                }
-            }
-        });
-    } else if (param === 'resetParticles') {
-        simulationObjects.forEach(obj => {
-            if (obj.userData.type === 'particle') {
-                const angle = Math.random() * Math.PI * 2;
-                const distance = 15 + Math.random() * 5;
-                obj.position.set(
-                    Math.cos(angle) * distance,
-                    0,
-                    Math.sin(angle) * distance
-                );
-                const speedInput = document.getElementById('particleSpeed');
-                const speed = speedInput ? parseFloat(speedInput.value) : 0.3;
-                obj.userData.velocity.set(
-                    -Math.sin(angle) * speed,
-                    0,
-                    Math.cos(angle) * speed
-                );
-            }
-        });
+    } else if (param === 'ballBMass') {
+        // 更新B球质量
+        const ballB = simulationObjects.find(obj => obj.userData.type === 'gravity-ball' && obj.userData.ballName === 'B');
+        if (ballB) {
+            ballB.userData.mass = value;
+        }
+    } else if (param === 'gravityWellDamping') {
+        // 更新阻尼开关状态
+        scene.userData.gravityWellDamping = value;
+    } else if (param === 'gravityWellResetVelocity') {
+        // 更新重置速度选项状态
+        scene.userData.gravityWellResetVelocity = value;
+    } else if (param === 'resetBalls') {
+        // 重置球体到初始状态
+        resetGravityWell();
     }
 }
 

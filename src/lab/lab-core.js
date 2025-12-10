@@ -17,7 +17,7 @@ export let controls;
 export let simulationObjects = [];
 export let labelObjects = [];
 export let animationId;
-export let isPlaying = true;
+export let isPlaying = false; // 默认暂停状态
 export let currentSimulation = 'solar-system';
 
 // 设置播放状态

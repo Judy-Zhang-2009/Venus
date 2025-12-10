@@ -2,10 +2,11 @@ import { currentSimulation, scene, simulationObjects, camera, controls, isPlayin
 import { initSimulation } from './lab-core.js';
 import { updateSimulationParameter } from './lab-controls-params.js';
 import { updateURLSimulationType, initURLListener, getSimulationTypeFromURL } from './lab-url.js';
+import { resetGravityWell } from './lab-gravity-well.js';
 
 /**
  * 更新参数控制面板
- * 从当前模拟状态读取初始值，确保滑块位置与实际状态一致
+ * 根据当前模拟类型创建相应的控制元素，从模拟状态读取初始值确保滑块位置与实际状态一致
  */
 export function updateParameterControls() {
     const controlsContainer = document.getElementById('parameter-controls');
@@ -14,20 +15,43 @@ export function updateParameterControls() {
     switch(currentSimulation) {
         case 'solar-system':
             const speedValue = getSolarSystemSpeed();
-            const cameraDistValue = getCameraDistance();
             addRangeControl(controlsContainer, 'speed', '运行速度', 0.1, 2, speedValue, 0.1);
-            addRangeControl(controlsContainer, 'cameraDistance', '视角距离', 30, 100, cameraDistValue, 1);
             break;
         case 'orbital-mechanics':
             const orbitalSpeedValue = getOrbitalSpeed();
             addRangeControl(controlsContainer, 'orbitalSpeed', '轨道速度', 0.01, 0.1, orbitalSpeedValue, 0.01);
             break;
         case 'gravity-well':
-            const massValue = getGravityWellMass();
-            const particleSpeedValue = getParticleSpeed();
-            addRangeControl(controlsContainer, 'mass', '中心质量', 0.5, 3, massValue, 0.1);
-            addRangeControl(controlsContainer, 'particleSpeed', '粒子速度', 0.1, 1, particleSpeedValue, 0.1);
-            addButtonControl(controlsContainer, 'resetParticles', '重置粒子');
+            // 引力井模拟使用箭头拖动控制速度
+            // 添加提示信息
+            const hint = document.createElement('div');
+            hint.className = 'parameter-item';
+            hint.style.color = '#888';
+            hint.style.fontSize = '12px';
+            hint.textContent = '拖动箭头调整初始速度和方向';
+            controlsContainer.appendChild(hint);
+            
+            // 添加A球质量滑块（质量上限100）
+            const ballA = simulationObjects.find(obj => obj.userData.type === 'gravity-ball' && obj.userData.ballName === 'A');
+            const massAValue = ballA ? ballA.userData.mass : 2.0;
+            addRangeControl(controlsContainer, 'ballAMass', 'A球质量', 0.1, 100, massAValue, 0.1);
+            
+            // 添加B球质量滑块（质量上限100）
+            const ballB = simulationObjects.find(obj => obj.userData.type === 'gravity-ball' && obj.userData.ballName === 'B');
+            const massBValue = ballB ? ballB.userData.mass : 1.0;
+            addRangeControl(controlsContainer, 'ballBMass', 'B球质量', 0.1, 100, massBValue, 0.1);
+            
+            // 添加阻尼开关
+            const dampingEnabled = scene.userData.gravityWellDamping !== undefined 
+                ? scene.userData.gravityWellDamping 
+                : false;
+            addCheckboxControl(controlsContainer, 'gravityWellDamping', '碰撞阻尼', dampingEnabled);
+            
+            // 添加重置速度选项
+            const resetVelocityEnabled = scene.userData.gravityWellResetVelocity !== undefined 
+                ? scene.userData.gravityWellResetVelocity 
+                : false;
+            addCheckboxControl(controlsContainer, 'gravityWellResetVelocity', '重置时恢复速度', resetVelocityEnabled);
             break;
         case 'stellar-evolution':
             const starAgeValue = getStarAge();
@@ -49,6 +73,7 @@ export function updateParameterControls() {
 
 /**
  * 从当前模拟状态读取太阳系运行速度
+ * @returns {number} 当前运行速度值，如果未找到行星对象则返回默认值1.0
  */
 function getSolarSystemSpeed() {
     const planet = simulationObjects.find(obj => obj.userData.type === 'planet');
@@ -59,17 +84,8 @@ function getSolarSystemSpeed() {
 }
 
 /**
- * 从当前相机状态读取距离
- */
-function getCameraDistance() {
-    if (camera) {
-        return camera.position.length();
-    }
-    return 50;
-}
-
-/**
  * 从当前模拟状态读取轨道速度
+ * @returns {number} 当前轨道速度值，如果未找到轨道对象则返回默认值0.05
  */
 function getOrbitalSpeed() {
     const orbital = simulationObjects.find(obj => obj.userData.type === 'orbital');
@@ -80,25 +96,15 @@ function getOrbitalSpeed() {
 }
 
 /**
- * 从当前模拟状态读取中心质量
+ * 从当前模拟状态读取初始速度
+ * @returns {number} 当前初始速度值，如果未找到则返回默认值0.1
  */
-function getGravityWellMass() {
-    const mass = simulationObjects.find(obj => obj.userData.type === 'central-mass');
-    if (mass && mass.userData.mass !== undefined) {
-        return mass.userData.mass;
+function getInitialSpeed() {
+    const ball = simulationObjects.find(obj => obj.userData.type === 'gravity-ball');
+    if (ball && ball.userData.initialSpeed !== undefined) {
+        return ball.userData.initialSpeed;
     }
-    return 1.0;
-}
-
-/**
- * 从当前模拟状态读取粒子速度
- */
-function getParticleSpeed() {
-    const particle = simulationObjects.find(obj => obj.userData.type === 'particle');
-    if (particle && particle.userData.velocity) {
-        return particle.userData.velocity.length();
-    }
-    return 0.3;
+    return 0.1;
 }
 
 /**
@@ -127,14 +133,14 @@ function getEvolutionSpeed() {
 
 
 /**
- * 添加范围滑块控制
- * @param {HTMLElement} container - 容器元素
- * @param {string} id - 控件ID
- * @param {string} label - 标签文本
- * @param {number} min - 最小值
- * @param {number} max - 最大值
- * @param {number} value - 初始值（从当前状态读取）
- * @param {number} step - 步进值
+ * 创建并添加范围滑块控制元素
+ * @param {HTMLElement} container - 父容器元素
+ * @param {string} id - 滑块元素的唯一标识符
+ * @param {string} label - 滑块标签文本
+ * @param {number} min - 滑块最小值
+ * @param {number} max - 滑块最大值
+ * @param {number} value - 滑块初始值（从当前模拟状态读取）
+ * @param {number} step - 滑块步进值
  */
 function addRangeControl(container, id, label, min, max, value, step) {
     const item = document.createElement('div');
@@ -183,10 +189,42 @@ function addRangeControl(container, id, label, min, max, value, step) {
 }
 
 /**
- * 添加按钮控制
+ * 添加复选框控制
  * @param {HTMLElement} container - 容器元素
  * @param {string} id - 控件ID
- * @param {string} label - 按钮文本
+ * @param {string} label - 标签文本
+ * @param {boolean} checked - 是否选中
+ */
+function addCheckboxControl(container, id, label, checked = false) {
+    const item = document.createElement('div');
+    item.className = 'parameter-item';
+
+    const labelEl = document.createElement('label');
+    labelEl.textContent = label;
+    labelEl.setAttribute('for', id);
+    labelEl.style.display = 'flex';
+    labelEl.style.alignItems = 'center';
+    labelEl.style.gap = '8px';
+
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.id = id;
+    input.checked = checked;
+
+    input.addEventListener('change', (e) => {
+        updateSimulationParameter(id, e.target.checked);
+    });
+
+    labelEl.appendChild(input);
+    item.appendChild(labelEl);
+    container.appendChild(item);
+}
+
+/**
+ * 创建并添加按钮控制元素
+ * @param {HTMLElement} container - 父容器元素
+ * @param {string} id - 按钮元素的唯一标识符
+ * @param {string} label - 按钮显示的文本内容
  */
 function addButtonControl(container, id, label) {
     const item = document.createElement('div');
@@ -209,7 +247,8 @@ function addButtonControl(container, id, label) {
 
 
 /**
- * 设置事件监听器
+ * 初始化并设置全局事件监听器
+ * 包括模拟类型切换、重置按钮、播放/暂停按钮及URL历史记录监听
  */
 export function setupEventListeners() {
     const simulationTypeSelect = document.getElementById('simulation-type');
@@ -234,30 +273,34 @@ export function setupEventListeners() {
     });
     
     document.getElementById('reset-btn').addEventListener('click', () => {
-        initSimulation(currentSimulation);
-        if (camera && controls) {
-            if (currentSimulation === 'solar-system') {
-                camera.position.set(0, 20, 80);
-            } else {
-                camera.position.set(0, 0, 50);
-            }
-            camera.lookAt(0, 0, 0);
-            controls.target.set(0, 0, 0);
-            controls.update();
+        // 重置模拟：根据模拟类型调用相应的重置函数
+        // 注意：不重置相机视角，保持用户当前的观察角度
+        if (currentSimulation === 'gravity-well') {
+            // 引力井模拟：只重置位置，不重置质量、速度和拖动点
+            resetGravityWell();
+        } else {
+            // 其他模拟：重新初始化
+            initSimulation(currentSimulation);
         }
     });
     
-    document.getElementById('play-pause-btn').addEventListener('click', (e) => {
-        // 切换播放/暂停状态：控制模拟是否自动更新
-        const newValue = !isPlaying;
-        setPlaying(newValue);
-        e.target.textContent = newValue ? '暂停' : '播放';
-    });
+    const playPauseBtn = document.getElementById('play-pause-btn');
+    if (playPauseBtn) {
+        // 初始化按钮文本：根据默认状态设置
+        playPauseBtn.textContent = isPlaying ? '暂停' : '播放';
+        
+        playPauseBtn.addEventListener('click', (e) => {
+            // 切换播放/暂停状态：控制模拟是否自动更新
+            const newValue = !isPlaying;
+            setPlaying(newValue);
+            e.target.textContent = newValue ? '暂停' : '播放';
+        });
+    }
 }
 
 /**
- * 同步选择器值与当前模拟类型
- * 在初始化完成后调用，确保UI与状态一致
+ * 同步模拟类型选择器的显示值与当前模拟类型状态
+ * 在初始化完成后调用，确保用户界面与内部状态保持一致
  */
 export function syncSimulationTypeSelect() {
     const simulationTypeSelect = document.getElementById('simulation-type');
