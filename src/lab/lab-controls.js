@@ -31,9 +31,7 @@ export function updateParameterControls() {
             break;
         case 'stellar-evolution':
             const starAgeValue = getStarAge();
-            const brightnessValue = getStarBrightness();
             addRangeControl(controlsContainer, 'starAge', '恒星年龄', 0, 10, starAgeValue, 0.1);
-            addRangeControl(controlsContainer, 'brightness', '亮度', 0.3, 1, brightnessValue, 0.1);
             break;
         case 'star-map':
             const today = new Date();
@@ -112,21 +110,6 @@ function getStarAge() {
     return 0;
 }
 
-/**
- * 从当前模拟状态读取恒星亮度
- */
-function getStarBrightness() {
-    const star = simulationObjects.find(obj => obj.userData.type === 'star');
-    if (star) {
-        if (star.userData.brightness !== undefined) {
-            return star.userData.brightness;
-        }
-        if (star.material && star.material.emissiveIntensity !== undefined) {
-            return star.material.emissiveIntensity;
-        }
-    }
-    return 0.5;
-}
 
 /**
  * 添加范围滑块控制
